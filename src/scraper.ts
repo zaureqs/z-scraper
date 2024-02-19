@@ -84,9 +84,10 @@ export default async (keyword: string): Promise<{ products: Product[] }> => {
 
 async function getMoreInfo(products: Product[]) {
   try {
+    const browser = await puppeteer.launch();
     await Promise.all(
       products.map(async (product: Product) => {
-        const browser = await puppeteer.launch();
+        
         const page = await browser.newPage();
         await page.goto(product.url);
 
@@ -98,9 +99,10 @@ async function getMoreInfo(products: Product[]) {
           return descriptionElement.innerText.trim();
         });
         product.description = description;
-        await browser.close();
+        
       })
     );
+    await browser.close();
   } catch (error) {
     console.log(error);
   }
