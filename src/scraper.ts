@@ -55,7 +55,7 @@ export default async (keyword: string): Promise<{ products: Product[] }> => {
           const numReviews = numReviewsElement?.innerText.trim() || 'N/A';
           const price = priceElement?.innerText.trim() || 'N/A';
           const url =
-            "https://www.amazon.in" + urlElement?.getAttribute("href") || 'N/A';
+            "https://www.amazon.in" + urlElement?.getAttribute("href");
 
           results.push({
             name,
