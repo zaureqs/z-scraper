@@ -1,6 +1,5 @@
 import puppeteer from "puppeteer";
 
-
 interface Product {
   name: string;
   description: string;
@@ -13,18 +12,20 @@ interface Product {
 
 interface Review {
   author: string;
+  date: string;
   text: string;
   rating: string;
 }
 
 export default async (keyword: string): Promise<{ products: Product[] }> => {
+  let browser;
   try {
-    const browser = await puppeteer.launch();
+    browser = await puppeteer.launch();
     const page = await browser.newPage();
     await page.goto(`https://www.amazon.in/s?k=${encodeURIComponent(keyword)}`);
 
     const products: Product[] = await page.evaluate(async () => {
-      let results: Product[] = [];
+      const results: Product[] = [];
       const items = document.querySelectorAll(".s-result-item");
       items.forEach(async (item: Element) => {
         if (results.length >= 4) return;
@@ -47,13 +48,11 @@ export default async (keyword: string): Promise<{ products: Product[] }> => {
           "a.a-link-normal.s-underline-text.s-underline-link-text.s-link-style.a-text-normal"
         ) as HTMLElement;
 
-        if (
-          nameElement
-        ) {
+        if (nameElement) {
           const name = nameElement.innerText.trim();
-          const rating = ratingElement?.innerText.trim() || 'N/A';
-          const numReviews = numReviewsElement?.innerText.trim() || 'N/A';
-          const price = priceElement?.innerText.trim() || 'N/A';
+          const rating = ratingElement?.innerText.trim() || "N/A";
+          const numReviews = numReviewsElement?.innerText.trim() || "N/A";
+          const price = priceElement?.innerText.trim() || "N/A";
           const url =
             "https://www.amazon.in" + urlElement?.getAttribute("href");
 
@@ -70,40 +69,89 @@ export default async (keyword: string): Promise<{ products: Product[] }> => {
       });
       return results;
     });
-
-    await browser.close();
-
     await getMoreInfo(products);
 
     return { products };
   } catch (error) {
     console.log(error);
     return { products: [] };
+  } finally {
+    browser?.close();
   }
 };
 
 async function getMoreInfo(products: Product[]) {
+  let browser;
   try {
-    const browser = await puppeteer.launch();
-    await Promise.all(
-      products.map(async (product: Product) => {
-        
-        const page = await browser.newPage();
-        await page.goto(product.url);
+    browser = await puppeteer.launch();
 
-        const description: string = await page.evaluate(() => {
-          const descriptionElement = document.querySelector(
-            "ul.a-unordered-list.a-vertical.a-spacing-mini"
-          ) as HTMLElement;
+    for (const product of products) {
+      const page = await browser.newPage();
+      await page.goto(product.url);
 
-          return descriptionElement.innerText.trim();
+      const description: string = await page.evaluate(() => {
+        const descriptionElement = document.querySelector(
+          "ul.a-unordered-list.a-vertical.a-spacing-mini"
+        ) as HTMLElement;
+
+        return descriptionElement ? descriptionElement.innerText.trim() : "N/A";
+      });
+
+      const reviewUrl: string = await page.evaluate(() => {
+        const reviewUrlElement = document.querySelector(
+          "a.a-link-emphasis.a-text-bold"
+        ) as HTMLElement;
+
+        return reviewUrlElement
+          ? "https://www.amazon.in" + reviewUrlElement.getAttribute("href")
+          : "";
+      });
+
+      if (reviewUrl.length) {
+        const reviewPage = await browser.newPage();
+        await reviewPage.goto(reviewUrl);
+
+        const reviews: Review[] = await reviewPage.evaluate(() => {
+          const results: Review[] = [];
+          const items = document.querySelectorAll(
+            "div.a-section.review.aok-relative"
+          );
+
+          items.forEach(async (item: Element) => {
+            if (results.length >= 10) return;
+
+            const authorElement = item.querySelector(
+              "span.a-profile-name"
+            ) as HTMLElement;
+            const dateElement = item.querySelector(
+              "span.a-size-base.a-color-secondary.review-date"
+            ) as HTMLElement;
+            const textElement = item.querySelector(
+              "span.a-size-base.review-text.review-text-content"
+            ) as HTMLElement;
+            const ratingElement = item.querySelector(
+              "span.a-icon-alt"
+            ) as HTMLElement;
+
+            if (authorElement) {
+              const author = authorElement?.innerText.trim();
+              const text = textElement?.innerText.trim() || "N/A";
+              const date = dateElement?.innerText.trim() || "N/A";
+              const rating = ratingElement?.innerText.trim() || "N/A";
+              results.push({ author, date, text, rating });
+            }
+          });
+          return results;
         });
-        product.description = description;
-        
-      })
-    );
-    await browser.close();
+        product.reviews = reviews;
+      }
+      product.description = description;
+      await page.close();
+    }
+
   } catch (error) {
     console.log(error);
+  } finally {
+    await browser?.close();
   }
 }

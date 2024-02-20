@@ -46,6 +46,10 @@ Z-Scraper is a simple Node.js API built using Puppeteer to scrape product inform
     ```
 
 
+## Results
+
+![alt text](./result.png)
+
 ## Note
 - The API is currently tailored to scrape product data from Amazon.in only.
 - It fetches information for the top 4 search results due to Amazon's page structure.
